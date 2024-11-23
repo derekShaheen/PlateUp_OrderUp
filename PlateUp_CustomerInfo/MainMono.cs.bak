@@ -1,0 +1,412 @@
+﻿using HarmonyLib;
+using Kitchen;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems; // Required for EventSystem
+using UnityEngine.UI;
+using UnityEngine.VFX;
+
+namespace SkripOrderUp
+{
+    internal class MainMono : MonoBehaviour
+    {
+        // Define OrderGroup class
+        private class OrderGroup
+        {
+            public float StartTime { get; set; }
+            public List<ItemGroupView> Items { get; set; } = new List<ItemGroupView>();
+        }
+
+        // List to track OrderGroups
+        private List<OrderGroup> orderGroups = new List<OrderGroup>();
+
+        // HashSet to track active ItemGroupView instances
+        private HashSet<ItemGroupView> itemsInThought = new HashSet<ItemGroupView>();
+
+        // References to UI components
+        private Canvas ordersCanvas;
+        private TextMeshProUGUI ordersText;
+
+        // Reflection caching
+        private static readonly Type itemGroupViewType = typeof(ItemGroupView);
+        private static readonly FieldInfo colourblindLabelField = itemGroupViewType.GetField("ColourblindLabel", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // Singleton instance
+        public static MainMono Instance { get; private set; }
+
+        // Shared time variables
+        private float totalTime = 0f;
+        private int lastDisplayedTime = -1; // Initialize to -1 to ensure the first update occurs
+
+        public void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Debug.LogWarning("[OrderUp] Multiple instances of MainMono detected. Destroying duplicate.");
+                Destroy(this.gameObject);
+                return;
+            }
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+
+            // Initialize Harmony
+            Harmony harmonyInstance = new Harmony("Skrip.Plateup.OrderUp");
+            harmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
+            Debug.Log("[OrderUp] Harmony patches applied.");
+            InitializeUI();
+        }
+
+        public void Update()
+        {
+            // Update totalTime
+            totalTime += Time.deltaTime;
+
+            try
+            {
+                // Find all valid ItemGroupView instances in the scene
+                List<ItemGroupView> currentViews = FindObjectsOfType<ItemGroupView>().ToList();
+                List<ItemGroupView> validViews = new List<ItemGroupView>();
+
+                foreach (ItemGroupView view in currentViews)
+                {
+
+                    if (view == null || !view.gameObject.activeInHierarchy)
+                        continue;
+
+                    if (view.transform.parent == null)
+                    {
+                        //Debug.Log($"[OrderUp] {view.name} has no parent transform.");
+                        continue;
+                    }
+
+                    Transform Manager = view.transform.parent.Find("Manager");
+                    if (Manager == null)
+                        continue;
+
+                    Transform thoughtCloud = Manager.transform.Find("Thought Cloud");
+                    if (thoughtCloud == null)
+                        continue;
+
+                    VisualEffect visual = thoughtCloud.gameObject.GetComponent<VisualEffect>();
+                    if (visual != null && !visual.enabled)
+                        continue;
+
+                    // All checks passed, add to validViews
+                    validViews.Add(view);
+
+                }
+
+                // Detect new ItemGroupViews
+                List<ItemGroupView> newViews = validViews.Except(itemsInThought).ToList();
+
+                if (newViews.Count > 0)
+                {
+                    // Create a new OrderGroup for new views
+                    OrderGroup newOrderGroup = new OrderGroup
+                    {
+                        StartTime = totalTime,
+                        Items = newViews
+                    };
+                    orderGroups.Add(newOrderGroup);
+                    Debug.Log($"[OrderUp] Detected new order group with {newViews.Count} items.");
+                }
+
+                // Remove ItemGroupViews that are no longer present or have become null
+                List<ItemGroupView> removedViews = itemsInThought.Except(validViews).ToList();
+
+                if (removedViews.Count > 0)
+                {
+                    foreach (var removedView in removedViews)
+                    {
+                        // Remove the removedView from orderGroups
+                        foreach (var orderGroup in orderGroups.ToList())
+                        {
+                            if (orderGroup.Items.Contains(removedView))
+                            {
+                                orderGroup.Items.Remove(removedView);
+                                Debug.Log($"[OrderUp] Removed ItemGroupView: {removedView?.name} from an order group.");
+                                // If orderGroup is now empty, remove it
+                                if (orderGroup.Items.Count == 0)
+                                {
+                                    orderGroups.Remove(orderGroup);
+                                    Debug.Log($"[OrderUp] Removed empty OrderGroup.");
+                                }
+                                break; // Assuming an ItemGroupView can only be in one OrderGroup
+                            }
+                        }
+                    }
+                }
+
+                // Update the itemsInThought HashSet
+                itemsInThought = new HashSet<ItemGroupView>(validViews);
+
+                // Clean up any null ItemGroupViews in orderGroups
+                CleanUpOrderGroups();
+
+                // Update the order text display when the integer part of totalTime changes
+                int currentTimeInt = (int)totalTime;
+                if (currentTimeInt != lastDisplayedTime)
+                {
+                    UpdateOrderText();
+                    lastDisplayedTime = currentTimeInt;
+                }
+            }
+            catch (Exception ex)
+            {
+                //Debug.LogError($"[OrderUp] Error checking ItemGroupView: {ex.Message}");
+            }
+        }
+
+        private void CleanUpOrderGroups()
+        {
+            foreach (var orderGroup in orderGroups.ToList())
+            {
+                // Remove null items
+                orderGroup.Items.RemoveAll(item => item == null);
+
+                // If the order group is empty, remove it
+                if (orderGroup.Items.Count == 0)
+                {
+                    orderGroups.Remove(orderGroup);
+                    Debug.Log("[OrderUp] Removed empty OrderGroup during cleanup.");
+                }
+            }
+        }
+
+        private void UpdateOrderText()
+        {
+            if (orderGroups == null || orderGroups.Count == 0)
+            {
+                ordersText.text = string.Empty;
+                return;
+            }
+
+            StringBuilder allOrders = new StringBuilder();
+
+            // Iterate over OrderGroups in the order they were added
+            foreach (var orderGroup in orderGroups.OrderBy(og => og.StartTime))
+            {
+                // Calculate time elapsed
+                int secondsElapsed = (int)(totalTime - orderGroup.StartTime);
+                string timeElapsedString = $"{secondsElapsed}s";
+
+                // Group items within each OrderGroup
+                var groupedItems = orderGroup.Items
+                    .Where(view => view != null) // Ensure view is not null
+                    .OrderBy(view => view.name)
+                    .GroupBy(view =>
+                    {
+                        string displayName = CleanDisplayName(view.name);
+
+                        TextMeshPro colourblindLabel = colourblindLabelField?.GetValue(view) as TextMeshPro;
+                        string colourblindText = colourblindLabel != null ? colourblindLabel.text : string.Empty;
+                        if (!string.IsNullOrEmpty(colourblindText))
+                        {
+                            // If whole string is uppercase, then sort each character alphabetically
+                            if (colourblindText.All(char.IsUpper))
+                            {
+                                colourblindText = string.Concat(colourblindText.OrderBy(c => c));
+                            } 
+
+                            colourblindText = colourblindText.Replace("\n", " ");
+                            colourblindText = colourblindText.Trim();
+                            colourblindText = $"-{colourblindText}";
+                        }
+                        return (displayName, colourblindText);
+                    })
+                    .Select(g => new
+                    {
+                        DisplayName = g.Key.displayName,
+                        ColourblindText = g.Key.colourblindText,
+                        Count = g.Count()
+                    })
+                    .ToList();
+
+                // Skip this orderGroup if there are no valid items
+                if (groupedItems.Count == 0)
+                    continue;
+
+                // Build the order lines for this OrderGroup
+                StringBuilder orderGroupLines = new StringBuilder();
+                foreach (var item in groupedItems.OrderByDescending(comparer => comparer.Count)
+                                                 .OrderByDescending(comparer => comparer.DisplayName))
+                {
+                    string orderLine = item.Count > 1
+                        ? $"{item.Count}x{item.DisplayName}{item.ColourblindText}"
+                        : $"{item.DisplayName}{item.ColourblindText}";
+
+                    orderGroupLines.Append(orderLine + ", ");
+                }
+
+                // Remove the trailing comma and space
+                if (orderGroupLines.Length > 2)
+                    orderGroupLines.Length -= 2;
+
+                // Append the time elapsed to the order group
+                allOrders.AppendLine($"► {orderGroupLines.ToString()}  {timeElapsedString}");
+            }
+
+            ordersText.text = allOrders.ToString();
+        }
+
+        private string CleanDisplayName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            string displayName = name.Replace(" - Plated", "").Replace("(Clone)", "").Trim();
+            return displayName;
+        }
+
+        private void InitializeUI()
+        {
+            // Check if the Canvas already exists to prevent duplicates
+            if (GameObject.Find("OrderUpCanvas") != null)
+            {
+                ordersCanvas = GameObject.Find("OrderUpCanvas").GetComponent<Canvas>();
+                ordersText = ordersCanvas.GetComponentInChildren<TextMeshProUGUI>();
+                Debug.Log("[OrderUp] Existing OrderUpCanvas found and initialized.");
+                return;
+            }
+
+            // Create a new Canvas GameObject
+            GameObject canvasGO = new GameObject("OrderUpCanvas");
+            ordersCanvas = canvasGO.AddComponent<Canvas>();
+            ordersCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            // Add Canvas Scaler for UI scaling
+            CanvasScaler canvasScaler = canvasGO.AddComponent<CanvasScaler>();
+            canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasScaler.referenceResolution = new Vector2(1920, 1080);
+            canvasScaler.matchWidthOrHeight = 0.5f;
+
+            // Add Graphic Raycaster (optional, needed for UI interactions)
+            canvasGO.AddComponent<GraphicRaycaster>();
+
+            // Ensure an EventSystem exists in the scene
+            if (FindObjectOfType<EventSystem>() == null)
+            {
+                GameObject eventSystemGO = new GameObject("EventSystem");
+                eventSystemGO.AddComponent<EventSystem>();
+                eventSystemGO.AddComponent<StandaloneInputModule>();
+            }
+
+            // Create a Draggable Panel
+            GameObject draggablePanelGO = new GameObject("DraggablePanel");
+            draggablePanelGO.transform.SetParent(canvasGO.transform, false);
+
+            // Add RectTransform
+            RectTransform panelRect = draggablePanelGO.AddComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0, 1);
+            panelRect.anchorMax = new Vector2(0, 1);
+            panelRect.pivot = new Vector2(0, 1);
+            panelRect.anchoredPosition = new Vector2(0, -20); // Initial position
+            //panelRect.anchoredPosition = new Vector2(PreferencesManager.Get<float>("PosX", 0), PreferencesManager.Get<float>("PosY", 0)); // Initial position
+            // Ensure the initial position is within the canvas bounds
+            //panelRect.anchoredPosition = new Vector2(
+            //    Mathf.Clamp(panelRect.anchoredPosition.x, 0, canvasScaler.referenceResolution.x - 300),
+            //    Mathf.Clamp(panelRect.anchoredPosition.y, -canvasScaler.referenceResolution.y + 180, 0)
+            //);
+            panelRect.sizeDelta = new Vector2(600, 180); // Initial size
+
+            // Log initial position
+            Debug.Log($"[OrderUp] Initial panel position: {panelRect.anchoredPosition}");
+
+            // Add Image component for the background
+            Image backgroundImage = draggablePanelGO.AddComponent<Image>();
+            backgroundImage.color = new Color(0, 0, 0, 0.5f); // Semi-transparent black
+
+            // Add the Draggable component
+            draggablePanelGO.AddComponent<Draggable>();
+
+            // **Add Vertical Layout Group and Content Size Fitter to the panel**
+            VerticalLayoutGroup layoutGroup = draggablePanelGO.AddComponent<VerticalLayoutGroup>();
+            layoutGroup.childAlignment = TextAnchor.UpperCenter;
+            layoutGroup.childForceExpandWidth = false;
+            layoutGroup.childForceExpandHeight = false;
+            layoutGroup.childControlWidth = true;
+            layoutGroup.childControlHeight = true;
+            layoutGroup.spacing = 5; // Space between header and content
+
+            ContentSizeFitter contentSizeFitter = draggablePanelGO.AddComponent<ContentSizeFitter>();
+            contentSizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            contentSizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            // **Create Header Text**
+            GameObject headerGO = new GameObject("HeaderText");
+            headerGO.transform.SetParent(draggablePanelGO.transform, false);
+
+            TextMeshProUGUI headerText = headerGO.AddComponent<TextMeshProUGUI>();
+            headerText.text = "Order Up!";
+            headerText.alignment = TextAlignmentOptions.Center;
+            headerText.fontSize = 16; // Adjust font size as needed
+            headerText.color = new Color(1f, 1f, 1f, 0.7f); // Slightly faded white
+
+            // Configure RectTransform for headerText
+            RectTransform headerRect = headerText.GetComponent<RectTransform>();
+            headerRect.anchorMin = new Vector2(0.5f, 1);
+            headerRect.anchorMax = new Vector2(0.5f, 1);
+            headerRect.pivot = new Vector2(0.5f, 1);
+            headerRect.sizeDelta = new Vector2(0, 30); // Height of header
+            headerRect.anchoredPosition = new Vector2(0, 0);
+
+            // **Add Layout Element to HeaderText**
+            LayoutElement headerLayoutElement = headerText.gameObject.AddComponent<LayoutElement>();
+            headerLayoutElement.preferredWidth = -1; // Allow flexible width
+            headerLayoutElement.minWidth = 100;      // Set a minimum width if needed
+
+            // **Create Orders Text**
+            GameObject textGO = new GameObject("OrdersText");
+            textGO.transform.SetParent(draggablePanelGO.transform, false);
+
+            ordersText = textGO.AddComponent<TextMeshProUGUI>();
+            ordersText.alignment = TextAlignmentOptions.TopLeft;
+            ordersText.fontSize = 14;
+            ordersText.color = Color.white;
+            ordersText.enableWordWrapping = false; // Disable word wrapping
+            ordersText.margin = new Vector4(10, 10, 10, 10); // Padding inside the panel
+
+            // Configure RectTransform for ordersText
+            RectTransform ordersRect = ordersText.GetComponent<RectTransform>();
+            ordersRect.anchorMin = new Vector2(0, 1);
+            ordersRect.anchorMax = new Vector2(1, 1);
+            ordersRect.pivot = new Vector2(0.5f, 1);
+            ordersRect.sizeDelta = new Vector2(0, -60); // Adjust for padding
+            ordersRect.anchoredPosition = new Vector2(0, -30); // Position below header
+
+            // **Add Layout Element to OrdersText for flexible width and height**
+            LayoutElement ordersLayoutElement = ordersText.gameObject.AddComponent<LayoutElement>();
+            ordersLayoutElement.preferredWidth = -1; // Allow flexible width
+            ordersLayoutElement.minWidth = 300;      // Minimum width for the orders text
+            ordersLayoutElement.minHeight = 100;     // Minimum height for the orders text
+
+            // **Set Minimum Size for Draggable Panel**
+            LayoutElement panelLayoutElement = draggablePanelGO.AddComponent<LayoutElement>();
+            panelLayoutElement.minWidth = 300;  // Minimum width of the panel
+            panelLayoutElement.minHeight = 180; // Minimum height of the panel
+
+            // Debug.Log("[OrderUp] New OrderUpCanvas and DraggablePanel with OrdersText initialized.");
+        }
+
+
+        internal static string FormatTime(float totalSeconds)
+        {
+            if (totalSeconds > 59f)
+            {
+                int minutes = Mathf.FloorToInt(totalSeconds / 60f);
+                int seconds = Mathf.FloorToInt(totalSeconds % 60f);
+                return string.Format("{0}m {1}s", minutes, seconds);
+            }
+            else
+            {
+                int seconds = Mathf.CeilToInt(totalSeconds);
+                return string.Format("{0}s", seconds);
+            }
+        }
+    }
+}
