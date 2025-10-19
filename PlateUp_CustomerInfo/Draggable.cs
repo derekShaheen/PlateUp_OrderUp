@@ -1,61 +1,63 @@
 ﻿using SkripOrderUp;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
-public class Draggable : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+public class Draggable : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
-    private RectTransform dragRectTransform;
-    private Canvas parentCanvas;
-    private Vector2 originalLocalPointerPosition;
-    private Vector3 originalPanelLocalPosition;
+    RectTransform rect;
+    Canvas canvas;
+    RectTransform parentRect;
+    Vector2 pointerOffset;
 
-    private void Awake()
+    void Awake()
     {
-        dragRectTransform = GetComponent<RectTransform>();
-        parentCanvas = GetComponentInParent<Canvas>();
+        rect = GetComponent<RectTransform>();
+        canvas = GetComponentInParent<Canvas>(true);
+        parentRect = canvas != null ? (RectTransform)canvas.transform : null;
 
-        if (parentCanvas == null)
+        var g = GetComponent<Graphic>();
+        if (g == null)
         {
-            Debug.LogError("Draggable requires a Canvas parent.");
+            var img = gameObject.AddComponent<Image>();
+            img.color = new Color(0, 0, 0, 0);
         }
+
+        if (PreferencesManager.HasKey("PosX") && PreferencesManager.HasKey("PosY"))
+        {
+            rect.anchoredPosition = new Vector2(
+                PreferencesManager.Get<float>("PosX", rect.anchoredPosition.x),
+                PreferencesManager.Get<float>("PosY", rect.anchoredPosition.y)
+            );
+        }
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        rect.SetAsLastSibling();
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        originalPanelLocalPosition = dragRectTransform.localPosition;
-
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            parentCanvas.transform as RectTransform,
-            eventData.position,
-            eventData.pressEventCamera,
-            out originalLocalPointerPosition
-        );
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            parentRect, eventData.position, eventData.pressEventCamera, out var localPos))
+        {
+            pointerOffset = rect.anchoredPosition - localPos;
+        }
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (dragRectTransform == null || parentCanvas == null)
-            return;
-
-        Vector2 localPointerPosition;
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            parentCanvas.transform as RectTransform,
-            eventData.position,
-            eventData.pressEventCamera,
-            out localPointerPosition))
+            parentRect, eventData.position, eventData.pressEventCamera, out var localPos))
         {
-            Vector3 offsetToOriginal = localPointerPosition - originalLocalPointerPosition;
-            dragRectTransform.localPosition = originalPanelLocalPosition + offsetToOriginal;
-            
+            rect.anchoredPosition = localPos + pointerOffset;
         }
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
-        if (dragRectTransform == null || parentCanvas == null)
-            return;
-
-        PreferencesManager.Set<float>("PosX", dragRectTransform.anchoredPosition.x);
-        PreferencesManager.Set<float>("PosY", dragRectTransform.anchoredPosition.y);
+        PreferencesManager.Set<float>("PosX", rect.anchoredPosition.x);
+        PreferencesManager.Set<float>("PosY", rect.anchoredPosition.y);
     }
 }

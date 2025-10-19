@@ -28,6 +28,10 @@ namespace SkripOrderUp
             // Initialize UI
             InitializeUI();
 
+            OrdersCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            OrdersCanvas.overrideSorting = true;
+            OrdersCanvas.sortingOrder = 10000; // high enough to beat game UI
+
             // Subscribe to OrderManager events
             if (OrderManager.Instance != null)
             {

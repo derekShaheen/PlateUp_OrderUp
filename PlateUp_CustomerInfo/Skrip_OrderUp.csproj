@@ -37,6 +37,9 @@
     <Reference Include="Assembly-CSharp">
       <HintPath>A:\Games\Steam\steamapps\common\PlateUp\PlateUp\PlateUp_Data\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
+    <Reference Include="BepInEx.Harmony">
+      <HintPath>A:\Games\Steam\steamapps\common\PlateUp\PlateUp\BepInEx\core\BepInEx.Harmony.dll</HintPath>
+    </Reference>
     <Reference Include="Controllers">
       <HintPath>A:\Games\Steam\steamapps\common\PlateUp\PlateUp\PlateUp_Data\Managed\Controllers.dll</HintPath>
     </Reference>
