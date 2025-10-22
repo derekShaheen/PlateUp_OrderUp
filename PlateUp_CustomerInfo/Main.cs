@@ -21,6 +21,7 @@ namespace SkripOrderUp
         public bool IsComplete;
         public Vector3 SeatPosition;
         public Vector3 TablePosition;
+        public string IngredientsText;
     }
 
     public sealed class OrderGroupDto
@@ -47,6 +48,7 @@ namespace SkripOrderUp
             var go = new GameObject("OrderUp");
             go.AddComponent<OrderManager>();
             go.AddComponent<OrderView>();
+            go.AddComponent<SceneWatcher>();
         }
 
         protected override void OnUpdate()
@@ -56,7 +58,7 @@ namespace SkripOrderUp
             if (Orders.IsEmpty)
             {
                 if (inst != null)
-                    inst.UpdateFromEcs(new List<OrderGroupDto>()); // forces clear when no orders exist
+                    inst.UpdateFromEcs(new List<OrderGroupDto>());
                 return;
             }
 
@@ -84,7 +86,6 @@ namespace SkripOrderUp
 
                         var name = ResolveItemName(d.ItemID);
                         var extraName = d.ExtraID != 0 ? ResolveItemName(d.ExtraID) : string.Empty;
-
                         if (name.Equals(extraName))
                             extraName = string.Empty;
 
@@ -97,7 +98,8 @@ namespace SkripOrderUp
                             ExtraName = extraName,
                             IsComplete = d.IsComplete,
                             SeatPosition = d.SeatPosition,
-                            TablePosition = d.TablePosition
+                            TablePosition = d.TablePosition,
+                            IngredientsText = ResolveChosenIngredientsText(d.Item, d.ItemID)
                         });
                     }
 
@@ -113,6 +115,60 @@ namespace SkripOrderUp
             }
         }
 
+        private string ResolveChosenIngredientsText(Entity itemEntity, int primaryItemId)
+        {
+            if (itemEntity == default(Entity))
+                return string.Empty;
+            if (!EntityManager.Exists(itemEntity))
+                return string.Empty;
+            if (!EntityManager.HasComponent<CItem>(itemEntity))
+                return string.Empty;
+
+            var citem = EntityManager.GetComponentData<CItem>(itemEntity);
+            var comps = citem.Items;
+            if (comps.Count <= 1)
+                return string.Empty;
+
+            var primaryName = ResolveItemName(primaryItemId);
+
+            var names = new List<string>();
+            var seen = new HashSet<int>();
+
+            for (int idx = 0; idx < comps.Count; idx++)
+            {
+                int compId = comps[idx];
+                if (compId == 0 || compId == primaryItemId || seen.Contains(compId))
+                    continue;
+
+                Item comp;
+                if (!GameData.Main.TryGet<Item>(compId, out comp, true) || comp == null)
+                    continue;
+
+                if (comp.IsMergeableSide)
+                    continue;
+
+                string n = comp.name != null ? comp.name :
+                           (comp.Prefab != null ? comp.Prefab.name : null);
+
+                n = CleanDisplayName(n, true);
+                if (string.IsNullOrEmpty(n))
+                    continue;
+
+                if (string.Equals(n, primaryName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                names.Add(n);
+                seen.Add(compId);
+            }
+
+            if (names.Count == 0)
+                return string.Empty;
+
+            names.Sort(StringComparer.OrdinalIgnoreCase);
+
+            return " (" + string.Join(", ", names.ToArray()) + ")";
+        }
+
         private static string ResolveItemName(int itemId)
         {
             if (itemId == 0)
@@ -121,26 +177,8 @@ namespace SkripOrderUp
             Item item;
             if (GameData.Main != null && GameData.Main.TryGet<Item>(itemId, out item, true) && item != null)
             {
-                // For each list Item in item.NeedsIngredients, append their names
-                var name = string.Empty;
-                if(item.NeedsIngredients != null && item.NeedsIngredients.Count > 0)
-                {
-                    List<string> ingredientNames = new List<string>();
-                    foreach (var ingredient in item.NeedsIngredients)
-                    {
-                        Item ingredientItem;
-                        if (GameData.Main.TryGet<Item>(ingredient.ID, out ingredientItem, true) && ingredientItem != null)
-                        {
-                            ingredientNames.Add(CleanDisplayName(ingredientItem.name));
-                        }
-                    }
-                    if (ingredientNames.Count > 0)
-                    {
-                        name = string.Join("$ ", ingredientNames);
-                    }
-                }
                 if (item.name != null)
-                    return CleanDisplayName(item.name + name);
+                    return CleanDisplayName(item.name);
                 if (item.Prefab != null)
                     return CleanDisplayName(item.Prefab.name);
             }
@@ -148,7 +186,7 @@ namespace SkripOrderUp
             return "Item#" + itemId;
         }
 
-        private static string CleanDisplayName(string name)
+        private static string CleanDisplayName(string name, bool isIngredient = false)
         {
             if (string.IsNullOrEmpty(name))
                 return string.Empty;
@@ -160,9 +198,26 @@ namespace SkripOrderUp
                                      .Replace("Cooked", string.Empty)
                                      .Replace("Condiment", string.Empty)
                                      .Replace("Coffee Cup", string.Empty)
+                                     .Replace("Container", string.Empty)
+                                     .Replace("Chopped", string.Empty)
+                                     .Replace("Plate", string.Empty)
+                                     .Replace("Rice", string.Empty)
+                                     .Replace("Grated", string.Empty)
+                                     .Replace("Tortilla", string.Empty)
+                                     .Replace("Sauce", string.Empty)
+                                     .Replace("Slice", string.Empty)
+                                     .Replace("Turkey Gravy", "Gravy")
+                                     .Replace("Bun", string.Empty)
+                                     .Replace("Individual", string.Empty)
+                                     .Replace("Bread", string.Empty)
                                      .Trim();
 
-            // If displayName contains "Pie", strip the text before Pie
+            if(isIngredient)
+            {
+                displayName = displayName.Replace("Steak", string.Empty)
+                                         .Trim();
+            }
+
             if (displayName.Contains("Pie"))
             {
                 displayName = "Pie";
@@ -170,6 +225,12 @@ namespace SkripOrderUp
             else if (displayName.Contains("Cake"))
             {
                 displayName = "Cake";
+            }
+
+            // Remove any double spaces that may have been introduced
+            while (displayName.Contains("  "))
+            {
+                displayName = displayName.Replace("  ", " ");
             }
 
             return displayName;

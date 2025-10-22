@@ -116,6 +116,7 @@
     <Compile Include="Draggable.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="Main.cs" />
+    <Compile Include="SceneWatcher.cs" />
     <None Include="MainMono.cs.bak" />
     <Compile Include="MainMono.cs" />
     <Compile Include="OrderManager.cs" />
