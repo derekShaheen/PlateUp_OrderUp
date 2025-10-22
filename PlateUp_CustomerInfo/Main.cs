@@ -1,8 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using HarmonyLib;
 using Kitchen;
 using KitchenData;
 using KitchenMods;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
@@ -49,6 +51,9 @@ namespace SkripOrderUp
             go.AddComponent<OrderManager>();
             go.AddComponent<OrderView>();
             go.AddComponent<SceneWatcher>();
+
+            Harmony harmonyInstance = new Harmony("Skrip.Plateup.OrderUp");
+            harmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
         }
 
         protected override void OnUpdate()
