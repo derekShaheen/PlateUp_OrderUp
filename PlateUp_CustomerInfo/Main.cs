@@ -1,19 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using Kitchen;
 using KitchenData;
 using KitchenMods;
-using TMPro;
 using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
-using UnityEngine.UI;
-using System.Linq;
 
 namespace SkripOrderUp
 {
     public struct COrderLogged : IComponentData { }
+
+    public class OrderItemDto
+    {
+        public int ItemID;
+        public string ItemName;
+        public bool IsSide;
+        public int ExtraID;
+        public string ExtraName;
+        public bool IsComplete;
+        public Vector3 SeatPosition;
+        public Vector3 TablePosition;
+    }
+
+    public sealed class OrderGroupDto
+    {
+        public Entity Group;
+        public List<OrderItemDto> Items = new List<OrderItemDto>();
+    }
 
     public class Main : GenericSystemBase, IModSystem
     {
@@ -22,124 +36,143 @@ namespace SkripOrderUp
 
         private EntityQuery Orders;
 
-
-
         protected override void Initialise()
         {
             base.Initialise();
+
             Orders = GetEntityQuery(
                 ComponentType.ReadOnly<CInterfaceOf>(),
-                ComponentType.ReadOnly<CDisplayedItem>(),
-                ComponentType.Exclude<COrderLogged>() // Initially exclude processed orders
-            );
+                ComponentType.ReadOnly<CDisplayedItem>());
 
-            // Optionally, initialize Harmony patches if needed
-            //Harmony harmony = new Harmony("Skrip.Plateup.OrderUp");
-            //harmony.PatchAll(Assembly.GetExecutingAssembly());
-
-            GameObject orderTrackerGO = new GameObject("OrderUp");
-            orderTrackerGO.AddComponent<OrderManager>();
-            orderTrackerGO.AddComponent<OrderView>();
+            var go = new GameObject("OrderUp");
+            go.AddComponent<OrderManager>();
+            go.AddComponent<OrderView>();
         }
 
         protected override void OnUpdate()
         {
-            //// Fetch new orders (entities without COrderLogged)
-            //var newOrders = Orders.ToEntityArray(Allocator.TempJob);
+            var inst = OrderManager.Instance;
 
-            //foreach (var entity in newOrders)
-            //{
-            //    // Get the DynamicBuffer<CDisplayedItem> attached to the entity
-            //    var displayedItems = EntityManager.GetBuffer<CDisplayedItem>(entity);
+            if (Orders.IsEmpty)
+            {
+                if (inst != null)
+                    inst.UpdateFromEcs(new List<OrderGroupDto>()); // forces clear when no orders exist
+                return;
+            }
 
-            //    // Initialize a string to accumulate order details
-            //    string orderDetails = "New Order:\n";
+            var entities = Orders.ToEntityArray(Allocator.Temp);
+            try
+            {
+                var dtoList = new List<OrderGroupDto>();
 
-            //    foreach (var item in displayedItems)
-            //    {
-            //        // Access item properties
-            //        bool isComplete = item.IsComplete;
-            //        Vector3 seatPosition = item.SeatPosition;
-            //        Vector3 tablePosition = item.TablePosition;
-            //        Entity itemEntity = item.Item;
-            //        int itemId = item.ItemID;
-            //        bool isSide = item.IsSide;
-            //        bool showExtra = item.ShowExtra;
-            //        int extraId = item.ExtraID;
-            //        bool isSatisfiedBySharer = item.IsSatisfiedBySharer;
+                for (int gi = 0; gi < entities.Length; gi++)
+                {
+                    var e = entities[gi];
 
-            //        // Fetch item data from GameData
-            //        GameData.Main.TryGet<Item>(itemId, out Item gameItem, false);
-            //        string itemName = gameItem != null ? gameItem.Prefab.name : $"ItemID {itemId}";
+                    if (!EntityManager.HasComponent<CDisplayedItem>(e))
+                        continue;
 
-            //        // Access the ColourblindLabel via reflection
-            //        TextMeshPro colourblindLabel = GetColourblindLabel(gameItem?.Prefab);
-            //        string colourblindText = colourblindLabel != null ? colourblindLabel.text : "N/A";
+                    var buf = EntityManager.GetBuffer<CDisplayedItem>(e);
+                    if (buf.Length == 0)
+                        continue;
 
-            //        // Accumulate order information with ColourblindLabel
-            //        orderDetails += $"> {itemName}\n";
-            //        orderDetails += $"- Colourblind Label: {colourblindText}\n";
-            //    }
+                    var groupDto = new OrderGroupDto { Group = e };
 
-            //    // Add the new order to the activeOrders dictionary
-            //    activeOrders.Add(entity, orderDetails);
+                    for (int i = 0; i < buf.Length; i++)
+                    {
+                        var d = buf[i];
 
-            //    // Update the TextMeshProUGUI text
-            //    UpdateOrderText();
+                        var name = ResolveItemName(d.ItemID);
+                        var extraName = d.ExtraID != 0 ? ResolveItemName(d.ExtraID) : string.Empty;
 
-            //    // Mark the entity as processed by adding COrderLogged
-            //    EntityManager.AddComponent<COrderLogged>(entity);
-            //}
+                        if (name.Equals(extraName))
+                            extraName = string.Empty;
 
-            //newOrders.Dispose();
+                        groupDto.Items.Add(new OrderItemDto
+                        {
+                            ItemID = d.ItemID,
+                            ItemName = name,
+                            IsSide = d.IsSide,
+                            ExtraID = d.ExtraID,
+                            ExtraName = extraName,
+                            IsComplete = d.IsComplete,
+                            SeatPosition = d.SeatPosition,
+                            TablePosition = d.TablePosition
+                        });
+                    }
 
-            //// Now, check for completed orders
-            //CheckForCompletedOrders();
+                    dtoList.Add(groupDto);
+                }
+
+                if (inst != null)
+                    inst.UpdateFromEcs(dtoList);
+            }
+            finally
+            {
+                entities.Dispose();
+            }
         }
 
-        //private void CheckForCompletedOrders()
-        //{
-        //    // Create a query for entities that have been processed (COrderLogged)
-        //    var completedOrderQuery = GetEntityQuery(
-        //        ComponentType.ReadOnly<CInterfaceOf>(),
-        //        ComponentType.ReadOnly<CDisplayedItem>(),
-        //        ComponentType.ReadOnly<COrderLogged>()
-        //    );
+        private static string ResolveItemName(int itemId)
+        {
+            if (itemId == 0)
+                return "Item#0";
 
-        //    var completedEntities = completedOrderQuery.ToEntityArray(Allocator.TempJob);
+            Item item;
+            if (GameData.Main != null && GameData.Main.TryGet<Item>(itemId, out item, true) && item != null)
+            {
+                // For each list Item in item.NeedsIngredients, append their names
+                var name = string.Empty;
+                if(item.NeedsIngredients != null && item.NeedsIngredients.Count > 0)
+                {
+                    List<string> ingredientNames = new List<string>();
+                    foreach (var ingredient in item.NeedsIngredients)
+                    {
+                        Item ingredientItem;
+                        if (GameData.Main.TryGet<Item>(ingredient.ID, out ingredientItem, true) && ingredientItem != null)
+                        {
+                            ingredientNames.Add(CleanDisplayName(ingredientItem.name));
+                        }
+                    }
+                    if (ingredientNames.Count > 0)
+                    {
+                        name = string.Join("$ ", ingredientNames);
+                    }
+                }
+                if (item.name != null)
+                    return CleanDisplayName(item.name + name);
+                if (item.Prefab != null)
+                    return CleanDisplayName(item.Prefab.name);
+            }
 
-        //    foreach (var entity in completedEntities)
-        //    {
-        //        var displayedItems = EntityManager.GetBuffer<CDisplayedItem>(entity);
+            return "Item#" + itemId;
+        }
 
-        //        // Check if all items in the order are complete
-        //        bool allComplete = true;
-        //        foreach (var item in displayedItems)
-        //        {
-        //            if (!item.IsComplete)
-        //            {
-        //                allComplete = false;
-        //                break;
-        //            }
-        //        }
+        private static string CleanDisplayName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
 
-        //        if (allComplete)
-        //        {
-        //            // Remove the order from activeOrders and update the UI
-        //            if (activeOrders.ContainsKey(entity))
-        //            {
-        //                activeOrders.Remove(entity);
-        //                UpdateOrderText();
-        //            }
+            string displayName = name.Replace("Plated", string.Empty)
+                                     .Replace("(Clone)", string.Empty)
+                                     .Replace("-", string.Empty)
+                                     .Replace("Flavour Icon", "Cake")
+                                     .Replace("Cooked", string.Empty)
+                                     .Replace("Condiment", string.Empty)
+                                     .Replace("Coffee Cup", string.Empty)
+                                     .Trim();
 
-        //            // Remove the COrderLogged component to allow future processing
-        //            EntityManager.RemoveComponent<COrderLogged>(entity);
-        //        }
-        //    }
+            // If displayName contains "Pie", strip the text before Pie
+            if (displayName.Contains("Pie"))
+            {
+                displayName = "Pie";
+            }
+            else if (displayName.Contains("Cake"))
+            {
+                displayName = "Cake";
+            }
 
-        //    completedEntities.Dispose();
-        //}
-
-       
+            return displayName;
+        }
     }
 }
