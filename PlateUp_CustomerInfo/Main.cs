@@ -210,11 +210,19 @@ namespace SkripOrderUp
                                      .Replace("Bun", string.Empty)
                                      .Replace("Individual", string.Empty)
                                      .Replace("Bread", string.Empty)
+                                     .Replace("Pot", string.Empty)
+                                     .Replace("Serving", string.Empty)
+                                     .Replace("Ingredient", string.Empty)
+                                     .Replace("Stand", string.Empty)
+                                     .Replace("Flavour", "Cake")
                                      .Trim();
 
             if(isIngredient)
             {
                 displayName = displayName.Replace("Steak", string.Empty)
+                                         .Replace("Serving", string.Empty)
+                                         .Replace("Board", string.Empty)
+                                         .Replace("Apple s", "Apples")
                                          .Trim();
             }
 
@@ -222,10 +230,10 @@ namespace SkripOrderUp
             {
                 displayName = "Pie";
             }
-            else if (displayName.Contains("Cake"))
-            {
-                displayName = "Cake";
-            }
+            //else if (displayName.Contains("Cake"))
+            //{
+            //    displayName = "Cake";
+            //}
 
             // Remove any double spaces that may have been introduced
             while (displayName.Contains("  "))
