@@ -227,6 +227,7 @@ namespace SkripOrderUp
                 displayName = displayName.Replace("Steak", string.Empty)
                                          .Replace("Serving", string.Empty)
                                          .Replace("Board", string.Empty)
+                                         .Replace("Ice Cream", string.Empty)
                                          .Replace("Apple s", "Apples")
                                          .Trim();
             }
