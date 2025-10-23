@@ -11,7 +11,7 @@ namespace SkripOrderUp
         {
             public GameObject ColourBlindObject { get; set; }
             public string DisplayName { get; set; }
-            public string ColourblindText { get; set; }
+            public string ExtrasText { get; set; }
             public string SideItem { get; set; }
             public bool IsComplete { get; set; }
             public Vector3 SeatPosition { get; set; }
@@ -132,7 +132,7 @@ namespace SkripOrderUp
                 {
                     ColourBlindObject = null,
                     DisplayName = displayWithIngredients,
-                    ColourblindText = extrasSuffix,
+                    ExtrasText = extrasSuffix,
                     SideItem = sideName,
                     IsComplete = it.IsComplete,
                     SeatPosition = it.SeatPosition,

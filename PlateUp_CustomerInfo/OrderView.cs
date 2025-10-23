@@ -132,7 +132,7 @@ namespace SkripOrderUp
                 var sides = group.Items.Where(i => i != null && !string.IsNullOrEmpty(i.SideItem)).ToList();
 
                 var mainGroups = mains
-                    .GroupBy(i => new { i.DisplayName, Extras = i.ColourblindText ?? "" })
+                    .GroupBy(i => new { i.DisplayName, Extras = i.ExtrasText ?? "" })
                     .Select(g => new MainGroup
                     {
                         Name = g.Key.DisplayName,
