@@ -36,9 +36,7 @@ namespace SkripOrderUp
         TextMeshProUGUI OrdersText { get => ordersText; set => ordersText = value; }
         TextMeshProUGUI HeaderText { get => headerText; set => headerText = value; }
 
-        // Hardcoded display options
-        const bool ShowTimer = true;
-        const bool CompactMode = false;
+        // display option
         const bool ShowSidesInline = false;
 
         // Flair colors (hex RGB with alpha via TMP)
@@ -162,42 +160,22 @@ namespace SkripOrderUp
 
                 // Header (no bold)
                 sb.Append("<color=").Append(ColorAccent).Append(">Order #").Append(group.OrderNumber).Append("</color>");
-                if (ShowTimer)
-                {
-                    sb.Append("   <color=").Append(ColorSubtle).Append(">").Append(timeElapsedString).Append("</color>");
-                }
+                sb.Append("   <color=").Append(ColorSubtle).Append(">").Append(timeElapsedString).Append("</color>");
                 sb.Append('\n');
 
                 // Body
-                if (CompactMode)
+                BuildVerboseMains(sb, mainGroups);
+
+                if (sideGroups.Count > 0)
                 {
-                    BuildCompactMainLine(sb, mainGroups);
-                    if (ShowSidesInline && sideGroups.Count > 0)
+                    if (ShowSidesInline)
                     {
-                        sb.Append("  <color=").Append(ColorSubtle).Append(">│</color>  ");
+                        sb.Append("   ");
                         BuildInlineSides(sb, sideGroups);
                     }
-                    else if (!ShowSidesInline && sideGroups.Count > 0)
+                    else
                     {
-                        sb.Append('\n');
                         BuildSideBlock(sb, sideGroups);
-                    }
-                }
-                else
-                {
-                    BuildVerboseMains(sb, mainGroups);
-
-                    if (sideGroups.Count > 0)
-                    {
-                        if (ShowSidesInline)
-                        {
-                            sb.Append("   ");
-                            BuildInlineSides(sb, sideGroups);
-                        }
-                        else
-                        {
-                            BuildSideBlock(sb, sideGroups);
-                        }
                     }
                 }
 
@@ -209,26 +187,6 @@ namespace SkripOrderUp
             }
 
             OrdersText.text = sb.ToString();
-        }
-
-        static void BuildCompactMainLine(StringBuilder sb, List<MainGroup> mainGroups)
-        {
-            sb.Append("  ");
-            for (int i = 0; i < mainGroups.Count; i++)
-            {
-                var entry = mainGroups[i];
-                if (i > 0) sb.Append(",  ");
-                sb.Append("<color=").Append(ColorBullet).Append(">►</color> ");
-                if (entry.Count > 1)
-                {
-                    sb.Append(entry.Count).Append("x ");
-                }
-                sb.Append(entry.Name);
-                if (!string.IsNullOrEmpty(entry.Extras))
-                {
-                    sb.Append(" ").Append(entry.Extras);
-                }
-            }
         }
 
         static void BuildInlineSides(StringBuilder sb, List<SideGroup> sideGroups)
