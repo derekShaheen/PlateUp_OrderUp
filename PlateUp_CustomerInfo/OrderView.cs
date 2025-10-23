@@ -36,18 +36,22 @@ namespace SkripOrderUp
         TextMeshProUGUI OrdersText { get => ordersText; set => ordersText = value; }
         TextMeshProUGUI HeaderText { get => headerText; set => headerText = value; }
 
-        bool showTimer;
-        bool compactMode;
-        bool showSidesInline;
-        bool showSeatTable;
+        // Hardcoded display options
+        const bool ShowTimer = true;
+        const bool CompactMode = false;
+        const bool ShowSidesInline = false;
+
+        // Flair colors (hex RGB with alpha via TMP)
+        const string ColorAccent = "#FFD98A";     // soft amber for headers
+        const string ColorSubtle = "#AAAAAA";     // muted gray for timers/labels
+        const string ColorSep = "#444444";     // separator line color
+        const string ColorBullet = "#FFFFFF";     // main bullet color
+
+        // Box-drawing separator
+        const string Separator = "<color=" + ColorSep + ">───────────────</color>";
 
         public void Awake()
         {
-            showTimer = PreferencesManager.Get<int>("ShowTimer", 1) != 0;
-            compactMode = PreferencesManager.Get<int>("CompactMode", 0) != 0;
-            showSidesInline = PreferencesManager.Get<int>("ShowSidesInline", 1) != 0;
-            showSeatTable = PreferencesManager.Get<int>("ShowSeatTable", 0) != 0;
-
             InitializeUI();
 
             OrdersCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -114,11 +118,15 @@ namespace SkripOrderUp
 
             var sb = new StringBuilder(1024);
 
-            var orderedGroups = orderGroups.Where(g => g != null)
-                                           .OrderBy(g => g.OrderNumber);
+            var orderedGroups = orderGroups
+                .Where(g => g != null)
+                .OrderBy(g => g.OrderNumber)
+                .ToList();
 
-            foreach (var group in orderedGroups)
+            for (int gIdx = 0; gIdx < orderedGroups.Count; gIdx++)
             {
+                var group = orderedGroups[gIdx];
+
                 int secondsElapsed = (int)(Time.time - group.StartTime);
                 string timeElapsedString = Helpers.FormatTime(secondsElapsed);
 
@@ -152,32 +160,28 @@ namespace SkripOrderUp
                 if (mainGroups.Count == 0 && sideGroups.Count == 0)
                     continue;
 
-                sb.Append("Order #");
-                sb.Append(group.OrderNumber);
-                if (showTimer)
+                // Header (no bold)
+                sb.Append("<color=").Append(ColorAccent).Append(">Order #").Append(group.OrderNumber).Append("</color>");
+                if (ShowTimer)
                 {
-                    sb.Append("   <color=#AAAAAA>");
-                    sb.Append(timeElapsedString);
-                    sb.Append("</color>");
+                    sb.Append("   <color=").Append(ColorSubtle).Append(">").Append(timeElapsedString).Append("</color>");
                 }
                 sb.Append('\n');
 
-                if (compactMode)
+                // Body
+                if (CompactMode)
                 {
                     BuildCompactMainLine(sb, mainGroups);
-
-                    if (showSidesInline && sideGroups.Count > 0)
+                    if (ShowSidesInline && sideGroups.Count > 0)
                     {
-                        sb.Append("  |  ");
+                        sb.Append("  <color=").Append(ColorSubtle).Append(">│</color>  ");
                         BuildInlineSides(sb, sideGroups);
                     }
-                    else if (!showSidesInline && sideGroups.Count > 0)
+                    else if (!ShowSidesInline && sideGroups.Count > 0)
                     {
                         sb.Append('\n');
                         BuildSideBlock(sb, sideGroups);
                     }
-
-                    sb.Append('\n');
                 }
                 else
                 {
@@ -185,19 +189,22 @@ namespace SkripOrderUp
 
                     if (sideGroups.Count > 0)
                     {
-                        if (showSidesInline)
+                        if (ShowSidesInline)
                         {
                             sb.Append("   ");
                             BuildInlineSides(sb, sideGroups);
-                            sb.Append('\n');
                         }
                         else
                         {
                             BuildSideBlock(sb, sideGroups);
                         }
                     }
+                }
 
-                    sb.Append('\n');
+                // Separator between orders (no extra blank line)
+                if (gIdx < orderedGroups.Count - 1)
+                {
+                    sb.Append(Separator).Append('\n');
                 }
             }
 
@@ -211,32 +218,29 @@ namespace SkripOrderUp
             {
                 var entry = mainGroups[i];
                 if (i > 0) sb.Append(",  ");
-                sb.Append("► ");
+                sb.Append("<color=").Append(ColorBullet).Append(">►</color> ");
                 if (entry.Count > 1)
                 {
-                    sb.Append(entry.Count);
-                    sb.Append("x ");
+                    sb.Append(entry.Count).Append("x ");
                 }
                 sb.Append(entry.Name);
                 if (!string.IsNullOrEmpty(entry.Extras))
                 {
-                    sb.Append(" ");
-                    sb.Append(entry.Extras);
+                    sb.Append(" ").Append(entry.Extras);
                 }
             }
         }
 
         static void BuildInlineSides(StringBuilder sb, List<SideGroup> sideGroups)
         {
-            sb.Append("<color=#AAAAAA>sides:</color> ");
+            sb.Append("<color=").Append(ColorSubtle).Append(">sides:</color> ");
             for (int i = 0; i < sideGroups.Count; i++)
             {
                 if (i > 0) sb.Append(", ");
                 var entry = sideGroups[i];
                 if (entry.Count > 1)
                 {
-                    sb.Append(entry.Count);
-                    sb.Append("x ");
+                    sb.Append(entry.Count).Append("x ");
                 }
                 sb.Append(entry.Name);
             }
@@ -247,40 +251,35 @@ namespace SkripOrderUp
             for (int i = 0; i < mainGroups.Count; i++)
             {
                 var entry = mainGroups[i];
-                sb.Append("   ► ");
+                sb.Append("   <color=").Append(ColorBullet).Append(">►</color> ");
                 if (entry.Count > 1)
                 {
-                    sb.Append(entry.Count);
-                    sb.Append("x ");
+                    sb.Append(entry.Count).Append("x ");
                 }
                 sb.Append(entry.Name);
                 if (!string.IsNullOrEmpty(entry.Extras))
                 {
-                    sb.Append(" ");
-                    sb.Append(entry.Extras);
+                    sb.Append(" ").Append(entry.Extras);
                 }
                 sb.Append('\n');
             }
+            // No trailing blank line here; caller controls spacing
         }
 
         static void BuildSideBlock(StringBuilder sb, List<SideGroup> sideGroups)
         {
-            sb.Append("   ");
-            sb.Append("<color=#AAAAAA>sides:</color>");
-            sb.Append('\n');
-
+            sb.Append("   ").Append("<color=").Append(ColorSubtle).Append(">sides:</color>").Append('\n');
             for (int i = 0; i < sideGroups.Count; i++)
             {
                 var entry = sideGroups[i];
                 sb.Append("     • ");
                 if (entry.Count > 1)
                 {
-                    sb.Append(entry.Count);
-                    sb.Append("x ");
+                    sb.Append(entry.Count).Append("x ");
                 }
-                sb.Append(entry.Name);
-                sb.Append('\n');
+                sb.Append(entry.Name).Append('\n');
             }
+            // No extra blank line; caller controls separator
         }
 
         void InitializeUI()
