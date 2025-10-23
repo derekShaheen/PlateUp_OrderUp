@@ -220,6 +220,7 @@ namespace SkripOrderUp
                                      .Replace("Ingredient", string.Empty)
                                      .Replace("Stand", string.Empty)
                                      .Replace("Flavour", "Cake")
+                                     .Replace("Mince", "Meat")
                                      .Trim();
 
             if(isIngredient)

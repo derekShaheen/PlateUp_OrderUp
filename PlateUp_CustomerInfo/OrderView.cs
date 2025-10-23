@@ -179,7 +179,7 @@ namespace SkripOrderUp
                     }
                 }
 
-                // Separator between orders (no extra blank line)
+                // Separator between orders
                 if (gIdx < orderedGroups.Count - 1)
                 {
                     sb.Append(Separator).Append('\n');
@@ -221,7 +221,6 @@ namespace SkripOrderUp
                 }
                 sb.Append('\n');
             }
-            // No trailing blank line here; caller controls spacing
         }
 
         static void BuildSideBlock(StringBuilder sb, List<SideGroup> sideGroups)
@@ -237,7 +236,6 @@ namespace SkripOrderUp
                 }
                 sb.Append(entry.Name).Append('\n');
             }
-            // No extra blank line; caller controls separator
         }
 
         void InitializeUI()
