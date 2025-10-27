@@ -75,11 +75,21 @@ namespace SkripOrderUp
             }
         }
 
+        bool ShouldShowUI()
+        {
+            return ((GameInfo.CurrentScene == SceneType.Kitchen && !GameInfo.IsPreparationTime)
+                    || GameInfo.CurrentScene == SceneType.Franchise);
+        }
+
         void Update()
         {
-            if((GameInfo.CurrentScene == SceneType.Kitchen
-                && !GameInfo.IsPreparationTime)
-               || GameInfo.CurrentScene == SceneType.Franchise)
+            bool show = ShouldShowUI() && currentFontSize != -1f;
+            if (OrdersCanvas != null && OrdersCanvas.enabled != show)
+                OrdersCanvas.enabled = show;
+
+            if (!show)
+                return;
+
             if (OrdersText != null && OrdersText.fontSize != currentFontSize)
             {
                 if (currentFontSize == -1f)
