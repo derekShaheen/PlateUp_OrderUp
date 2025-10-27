@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Kitchen;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using System.Collections.Generic;
 
 namespace SkripOrderUp
 {
@@ -76,6 +77,9 @@ namespace SkripOrderUp
 
         void Update()
         {
+            if((GameInfo.CurrentScene == SceneType.Kitchen
+                && !GameInfo.IsPreparationTime)
+               || GameInfo.CurrentScene == SceneType.Franchise)
             if (OrdersText != null && OrdersText.fontSize != currentFontSize)
             {
                 if (currentFontSize == -1f)
