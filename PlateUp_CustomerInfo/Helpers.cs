@@ -8,6 +8,21 @@ using UnityEngine;
 
 namespace SkripOrderUp
 {
+    internal static class ClientDayState
+    {
+        public static bool IsDay { get; private set; }
+
+        public static void Update(TimeDisplayView.ViewData viewData)
+        {
+            IsDay = !viewData.IsNight && !viewData.IsPractice;
+        }
+
+        public static void Reset()
+        {
+            IsDay = false;
+        }
+    }
+
     internal class Helpers
     {
         internal static bool IsPlaying()

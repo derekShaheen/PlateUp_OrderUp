@@ -8,6 +8,16 @@ using UnityEngine;
 
 namespace SkripOrderUp.Patches
 {
+    [HarmonyPatch(typeof(TimeDisplayView), "UpdateData", new Type[] { typeof(TimeDisplayView.ViewData) })]
+    internal static class TimeDisplayViewUpdatePatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(TimeDisplayView.ViewData view_data)
+        {
+            ClientDayState.Update(view_data);
+        }
+    }
+
     [HarmonyPatch(typeof(ItemCollectionView), "UpdateData", new Type[] { typeof(ItemCollectionView.ViewData) })]
     internal static class ItemCollectionViewUpdatePatch
     {

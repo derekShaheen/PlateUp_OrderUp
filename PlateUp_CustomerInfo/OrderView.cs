@@ -77,8 +77,7 @@ namespace SkripOrderUp
 
         bool ShouldShowUI()
         {
-            return ((GameInfo.CurrentScene == SceneType.Kitchen && !GameInfo.IsPreparationTime)
-                    || GameInfo.CurrentScene == SceneType.Franchise);
+            return GameInfo.CurrentScene == SceneType.Kitchen && ClientDayState.IsDay;
         }
 
         void Update()

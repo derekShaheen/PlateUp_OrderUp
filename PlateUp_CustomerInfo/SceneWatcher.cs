@@ -19,6 +19,7 @@ namespace SkripOrderUp
                 return;
 
             _lastScene = current;
+            ClientDayState.Reset();
 
             var mgr = OrderManager.Instance;
             if (mgr == null)
