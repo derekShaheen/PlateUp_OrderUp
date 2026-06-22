@@ -1,7 +1,8 @@
-﻿using System;
+using Kitchen;
+using KitchenData;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Unity.Entities;
 
 namespace SkripOrderUp
 {
@@ -9,11 +10,9 @@ namespace SkripOrderUp
     {
         public class OrderItem
         {
-            public GameObject ColourBlindObject { get; set; }
             public string DisplayName { get; set; }
             public string ExtrasText { get; set; }
             public string SideItem { get; set; }
-            public bool IsComplete { get; set; }
             public Vector3 SeatPosition { get; set; }
             public Vector3 TablePosition { get; set; }
         }
@@ -25,11 +24,10 @@ namespace SkripOrderUp
             public int OrderNumber { get; set; }
         }
 
-        public List<OrderGroup> orderGroups = new List<OrderGroup>();
+        public readonly List<OrderGroup> orderGroups = new List<OrderGroup>();
 
-        private readonly Dictionary<Entity, OrderGroup> _groupsByEntity = new Dictionary<Entity, OrderGroup>();
-
-        private int _orderSeq = 0;
+        private readonly Dictionary<int, OrderGroup> _groupsByView = new Dictionary<int, OrderGroup>();
+        private int _orderSeq;
 
         public static OrderManager Instance { get; private set; }
         public event Action<List<OrderGroup>> OnOrdersUpdated;
@@ -41,105 +39,215 @@ namespace SkripOrderUp
                 Destroy(gameObject);
                 return;
             }
+
             Instance = this;
             DontDestroyOnLoad(gameObject);
         }
 
         public void OnDestroy()
         {
-            if (Instance == this) Instance = null;
+            if (Instance == this)
+                Instance = null;
         }
 
         public void ResetAll()
         {
-            _groupsByEntity.Clear();
+            _groupsByView.Clear();
             orderGroups.Clear();
             _orderSeq = 0;
-            var ev = OnOrdersUpdated;
-            if (ev != null) ev(orderGroups);
+            NotifyUpdated();
         }
 
-        public void UpdateFromEcs(List<OrderGroupDto> snapshot)
+        public void UpdateFromView(int viewId, ItemCollectionView.ViewData viewData)
         {
-            var seenActiveGroups = new HashSet<Entity>();
-
-            for (int i = 0; i < snapshot.Count; i++)
+            List<OrderItem> items = BuildItems(viewData.Items);
+            if (items.Count == 0)
             {
-                var dto = snapshot[i];
-                var builtItems = BuildItems(dto);
-                if (builtItems.Count == 0)
-                    continue;
-
-                seenActiveGroups.Add(dto.Group);
-
-                OrderGroup og;
-                if (!_groupsByEntity.TryGetValue(dto.Group, out og))
-                {
-                    og = new OrderGroup
-                    {
-                        StartTime = Time.time,
-                        OrderNumber = ++_orderSeq
-                    };
-                    _groupsByEntity[dto.Group] = og;
-                }
-
-                og.Items.Clear();
-                og.Items.AddRange(builtItems);
+                RemoveGroup(viewId);
+                return;
             }
 
-            if (_groupsByEntity.Count > 0)
+            OrderGroup group;
+            if (!_groupsByView.TryGetValue(viewId, out group))
             {
-                var toRemove = new List<Entity>();
-                foreach (var kvp in _groupsByEntity)
+                group = new OrderGroup
                 {
-                    if (!seenActiveGroups.Contains(kvp.Key))
-                        toRemove.Add(kvp.Key);
-                }
-                for (int r = 0; r < toRemove.Count; r++)
-                    _groupsByEntity.Remove(toRemove[r]);
+                    StartTime = Time.time,
+                    OrderNumber = ++_orderSeq
+                };
+                _groupsByView.Add(viewId, group);
             }
 
+            group.Items.Clear();
+            group.Items.AddRange(items);
+            RebuildSnapshot();
+        }
+
+        public void RemoveGroup(int viewId)
+        {
+            if (!_groupsByView.Remove(viewId))
+                return;
+
+            RebuildSnapshot();
+        }
+
+        private void RebuildSnapshot()
+        {
             orderGroups.Clear();
-            if (_groupsByEntity.Count > 0)
-            {
-                var tmp = new List<OrderGroup>(_groupsByEntity.Values);
-                tmp.Sort((a, b) => a.OrderNumber.CompareTo(b.OrderNumber));
-                orderGroups.AddRange(tmp);
-            }
-
-            var ev2 = OnOrdersUpdated;
-            if (ev2 != null) ev2(orderGroups);
+            orderGroups.AddRange(_groupsByView.Values);
+            orderGroups.Sort((a, b) => a.OrderNumber.CompareTo(b.OrderNumber));
+            NotifyUpdated();
         }
 
-        private static List<OrderItem> BuildItems(OrderGroupDto dto)
+        private void NotifyUpdated()
         {
-            var list = new List<OrderItem>(dto.Items.Count);
-            for (int j = 0; j < dto.Items.Count; j++)
+            var handler = OnOrdersUpdated;
+            if (handler != null)
+                handler(orderGroups);
+        }
+
+        private static List<OrderItem> BuildItems(List<ItemCollectionView.ItemData> source)
+        {
+            var result = new List<OrderItem>(source != null ? source.Count : 0);
+            if (source == null)
+                return result;
+
+            for (int i = 0; i < source.Count; i++)
             {
-                var it = dto.Items[j];
-                if (it.IsComplete)
+                ItemCollectionView.ItemData item = source[i];
+                if (item.ItemID == 0 || item.IsComplete || item.IsSatisfiedBySharer)
                     continue;
 
-                var extrasSuffix = string.IsNullOrEmpty(it.ExtraName) ? "" : (" w/ " + it.ExtraName);
-                var sideName = it.IsSide ? it.ItemName : "";
+                string itemName = ResolveItemName(item.ItemID);
+                string displayName = itemName + ResolveChosenIngredientsText(item.Components, item.ItemID);
+                string extraName = item.ShowExtra && item.ExtraID != 0
+                    ? ResolveItemName(item.ExtraID)
+                    : string.Empty;
 
-                if (extrasSuffix == it.ItemName) extrasSuffix = "";
-                if (sideName == it.ItemName) sideName = "";
-
-                var displayWithIngredients = it.ItemName + (string.IsNullOrEmpty(it.IngredientsText) ? "" : it.IngredientsText);
-
-                list.Add(new OrderItem
+                result.Add(new OrderItem
                 {
-                    ColourBlindObject = null,
-                    DisplayName = displayWithIngredients,
-                    ExtrasText = extrasSuffix,
-                    SideItem = sideName,
-                    IsComplete = it.IsComplete,
-                    SeatPosition = it.SeatPosition,
-                    TablePosition = it.TablePosition
+                    DisplayName = displayName,
+                    ExtrasText = string.IsNullOrEmpty(extraName) ? string.Empty : "w/ " + extraName,
+                    SideItem = item.IsSide ? displayName : string.Empty,
+                    SeatPosition = item.SeatPosition,
+                    TablePosition = item.TablePosition
                 });
             }
-            return list;
+
+            return result;
+        }
+
+        private static string ResolveChosenIngredientsText(ItemList components, int primaryItemId)
+        {
+            if (components.Count <= 1)
+                return string.Empty;
+
+            string primaryName = ResolveItemName(primaryItemId);
+            var names = new List<string>();
+            var seen = new HashSet<int>();
+
+            for (int i = 0; i < components.Count; i++)
+            {
+                int componentId = components[i];
+                if (componentId == 0 || componentId == primaryItemId || !seen.Add(componentId))
+                    continue;
+
+                Item component;
+                if (GameData.Main == null ||
+                    !GameData.Main.TryGet<Item>(componentId, out component, true) ||
+                    component == null ||
+                    component.IsMergeableSide)
+                {
+                    continue;
+                }
+
+                string name = component.name != null
+                    ? component.name
+                    : component.Prefab != null ? component.Prefab.name : null;
+
+                name = CleanDisplayName(name, true);
+                if (string.IsNullOrEmpty(name) ||
+                    string.Equals(name, primaryName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                names.Add(name);
+            }
+
+            if (names.Count == 0)
+                return string.Empty;
+
+            names.Sort(StringComparer.OrdinalIgnoreCase);
+            return " (" + string.Join(", ", names.ToArray()) + ")";
+        }
+
+        private static string ResolveItemName(int itemId)
+        {
+            Item item;
+            if (itemId != 0 &&
+                GameData.Main != null &&
+                GameData.Main.TryGet<Item>(itemId, out item, true) &&
+                item != null)
+            {
+                if (item.name != null)
+                    return CleanDisplayName(item.name);
+                if (item.Prefab != null)
+                    return CleanDisplayName(item.Prefab.name);
+            }
+
+            return "Item#" + itemId;
+        }
+
+        private static string CleanDisplayName(string name, bool isIngredient = false)
+        {
+            if (string.IsNullOrEmpty(name))
+                return string.Empty;
+
+            string displayName = name.Replace("Plated", string.Empty)
+                                     .Replace("(Clone)", string.Empty)
+                                     .Replace("-", string.Empty)
+                                     .Replace("Flavour Icon", "Cake")
+                                     .Replace("Cooked", string.Empty)
+                                     .Replace("Condiment", string.Empty)
+                                     .Replace("Coffee Cup", string.Empty)
+                                     .Replace("Container", string.Empty)
+                                     .Replace("Chopped", string.Empty)
+                                     .Replace("Plate", string.Empty)
+                                     .Replace("Rice", string.Empty)
+                                     .Replace("Grated", string.Empty)
+                                     .Replace("Tortilla", string.Empty)
+                                     .Replace("Sauce", string.Empty)
+                                     .Replace("Slice", string.Empty)
+                                     .Replace("Turkey Gravy", "Gravy")
+                                     .Replace("Bun", string.Empty)
+                                     .Replace("Individual", string.Empty)
+                                     .Replace("Bread", string.Empty)
+                                     .Replace("Serving", string.Empty)
+                                     .Replace("Ingredient", string.Empty)
+                                     .Replace("Stand", string.Empty)
+                                     .Replace("Flavour", "Cake")
+                                     .Replace("Mince", "Meat")
+                                     .Trim();
+
+            if (isIngredient)
+            {
+                displayName = displayName.Replace("Steak", string.Empty)
+                                         .Replace("Serving", string.Empty)
+                                         .Replace("Board", string.Empty)
+                                         .Replace("Ice Cream", string.Empty)
+                                         .Replace(" d", string.Empty)
+                                         .Replace("Apple s", "Apples")
+                                         .Trim();
+            }
+
+            if (displayName.Contains("Pie"))
+                displayName = "Pie";
+
+            while (displayName.Contains("  "))
+                displayName = displayName.Replace("  ", " ");
+
+            return displayName;
         }
     }
 }

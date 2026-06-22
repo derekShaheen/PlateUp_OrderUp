@@ -38,7 +38,7 @@ namespace SkripOrderUp
         TextMeshProUGUI HeaderText { get => headerText; set => headerText = value; }
 
         // display option
-        const bool ShowSidesInline = false;
+        static readonly bool ShowSidesInline = false;
 
         // Flair colors (hex RGB with alpha via TMP)
         const string ColorAccent = "#FFD98A";     // soft amber for headers

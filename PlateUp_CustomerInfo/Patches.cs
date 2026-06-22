@@ -8,6 +8,40 @@ using UnityEngine;
 
 namespace SkripOrderUp.Patches
 {
+    [HarmonyPatch(typeof(ItemCollectionView), "UpdateData", new Type[] { typeof(ItemCollectionView.ViewData) })]
+    internal static class ItemCollectionViewUpdatePatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(ItemCollectionView __instance, ItemCollectionView.ViewData view_data)
+        {
+            OrderManager manager = OrderManager.Instance;
+            if (manager == null)
+                return;
+
+            int viewId = __instance.GetInstanceID();
+            manager.UpdateFromView(viewId, view_data);
+
+            OrderCollectionLifetime tracker = __instance.GetComponent<OrderCollectionLifetime>();
+            if (tracker == null)
+            {
+                tracker = __instance.gameObject.AddComponent<OrderCollectionLifetime>();
+                tracker.ViewId = viewId;
+            }
+        }
+    }
+
+    internal sealed class OrderCollectionLifetime : MonoBehaviour
+    {
+        public int ViewId { get; set; }
+
+        private void OnDestroy()
+        {
+            OrderManager manager = OrderManager.Instance;
+            if (manager != null)
+                manager.RemoveGroup(ViewId);
+        }
+    }
+
     [HarmonyPatch(typeof(OptionsMenu<MenuAction>), "Setup")]
     public static class OptionsMenuSetupPatch
     {
