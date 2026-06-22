@@ -100,6 +100,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DisplayNameConfig.cs" />
     <Compile Include="Draggable.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="Main.cs" />
@@ -112,6 +113,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="OrderUp.DisplayNames.json">
+      <LogicalName>SkripOrderUp.OrderUp.DisplayNames.json</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -1,0 +1,44 @@
+{
+  "DishAndIngredientReplacements": [
+    { "Find": "Plated", "ReplaceWith": "" },
+    { "Find": "(Clone)", "ReplaceWith": "" },
+    { "Find": "-", "ReplaceWith": "" },
+    { "Find": "Flavour Icon", "ReplaceWith": "Cake" },
+    { "Find": "Cooked", "ReplaceWith": "" },
+    { "Find": "Condiment", "ReplaceWith": "" },
+    { "Find": "Coffee Cup", "ReplaceWith": "" },
+    { "Find": "Container", "ReplaceWith": "" },
+    { "Find": "Chopped", "ReplaceWith": "" },
+    { "Find": "Plate", "ReplaceWith": "" },
+    { "Find": "Rice", "ReplaceWith": "" },
+    { "Find": "Grated", "ReplaceWith": "" },
+    { "Find": "Tortilla", "ReplaceWith": "" },
+    { "Find": "Sauce", "ReplaceWith": "" },
+    { "Find": "Slice", "ReplaceWith": "" },
+    { "Find": "Turkey Gravy", "ReplaceWith": "Gravy" },
+    { "Find": "Bun", "ReplaceWith": "" },
+    { "Find": "Individual", "ReplaceWith": "" },
+    { "Find": "Bread", "ReplaceWith": "" },
+    { "Find": "Serving", "ReplaceWith": "" },
+    { "Find": "Served", "ReplaceWith": "" },
+    { "Find": "Ingredient", "ReplaceWith": "" },
+    { "Find": "Stand", "ReplaceWith": "" },
+    { "Find": "Flavour", "ReplaceWith": "Cake" },
+    { "Find": "(Nut Mixture Portion)", "ReplaceWith": "" },
+    { "Find": "Mince", "ReplaceWith": "Meat" }
+  ],
+  "IngredientOnlyReplacements": [
+    { "Find": "Steak", "ReplaceWith": "" },
+    { "Find": "Serving", "ReplaceWith": "" },
+    { "Find": "Served", "ReplaceWith": "" },
+    { "Find": "Board", "ReplaceWith": "" },
+    { "Find": "Ice Cream", "ReplaceWith": "" },
+    { "Find": " d", "ReplaceWith": "" },
+    { "Find": "Apple s", "ReplaceWith": "Apples" },
+    { "Find": "Wrapped", "ReplaceWith": "" },
+    { "Find": "Pizza Crust", "ReplaceWith": "" }
+  ],
+  "ContainsOverrides": [
+    { "Contains": "Pie", "DisplayName": "Pie" }
+  ]
+}

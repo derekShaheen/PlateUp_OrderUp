@@ -25,6 +25,8 @@ namespace SkripOrderUp
             if (_initialised)
                 return;
 
+            DisplayNameConfig.Load();
+
             if (OrderManager.Instance == null)
             {
                 var go = new GameObject("OrderUp");

@@ -60,6 +60,7 @@ namespace SkripOrderUp
 
         public void UpdateFromView(int viewId, ItemCollectionView.ViewData viewData)
         {
+            DisplayNameConfig.ReloadIfChanged();
             List<OrderItem> items = BuildItems(viewData.Items);
             if (items.Count == 0)
             {
@@ -201,53 +202,7 @@ namespace SkripOrderUp
 
         private static string CleanDisplayName(string name, bool isIngredient = false)
         {
-            if (string.IsNullOrEmpty(name))
-                return string.Empty;
-
-            string displayName = name.Replace("Plated", string.Empty)
-                                     .Replace("(Clone)", string.Empty)
-                                     .Replace("-", string.Empty)
-                                     .Replace("Flavour Icon", "Cake")
-                                     .Replace("Cooked", string.Empty)
-                                     .Replace("Condiment", string.Empty)
-                                     .Replace("Coffee Cup", string.Empty)
-                                     .Replace("Container", string.Empty)
-                                     .Replace("Chopped", string.Empty)
-                                     .Replace("Plate", string.Empty)
-                                     .Replace("Rice", string.Empty)
-                                     .Replace("Grated", string.Empty)
-                                     .Replace("Tortilla", string.Empty)
-                                     .Replace("Sauce", string.Empty)
-                                     .Replace("Slice", string.Empty)
-                                     .Replace("Turkey Gravy", "Gravy")
-                                     .Replace("Bun", string.Empty)
-                                     .Replace("Individual", string.Empty)
-                                     .Replace("Bread", string.Empty)
-                                     .Replace("Serving", string.Empty)
-                                     .Replace("Ingredient", string.Empty)
-                                     .Replace("Stand", string.Empty)
-                                     .Replace("Flavour", "Cake")
-                                     .Replace("Mince", "Meat")
-                                     .Trim();
-
-            if (isIngredient)
-            {
-                displayName = displayName.Replace("Steak", string.Empty)
-                                         .Replace("Serving", string.Empty)
-                                         .Replace("Board", string.Empty)
-                                         .Replace("Ice Cream", string.Empty)
-                                         .Replace(" d", string.Empty)
-                                         .Replace("Apple s", "Apples")
-                                         .Trim();
-            }
-
-            if (displayName.Contains("Pie"))
-                displayName = "Pie";
-
-            while (displayName.Contains("  "))
-                displayName = displayName.Replace("  ", " ");
-
-            return displayName;
+            return DisplayNameConfig.Clean(name, isIngredient);
         }
     }
 }
