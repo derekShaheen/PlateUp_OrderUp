@@ -1,5 +1,5 @@
 {
-  "BundledDefaultsVersion": 1,
+  "BundledDefaultsVersion": 4,
   "DishAndIngredientReplacements": [
     { "Find": "Plated", "ReplaceWith": "" },
     { "Find": "(Clone)", "ReplaceWith": "" },
@@ -23,9 +23,11 @@
     { "Find": "Serving", "ReplaceWith": "" },
     { "Find": "Served", "ReplaceWith": "" },
     { "Find": "Default", "ReplaceWith": "" },
+    { "Find": "Pomodoro", "ReplaceWith": "Pasta" },
     { "Find": "Ingredient", "ReplaceWith": "" },
     { "Find": "Stand", "ReplaceWith": "" },
     { "Find": "Flavour", "ReplaceWith": "Cake" },
+    { "Find": "Nut Roast", "ReplaceWith": "Nutmeg" },
     { "Find": "(Nut Mixture Portion)", "ReplaceWith": "" },
     { "Find": "Mince", "ReplaceWith": "Meat" }
   ],
@@ -35,9 +37,12 @@
     { "Find": "Served", "ReplaceWith": "" },
     { "Find": "Board", "ReplaceWith": "" },
     { "Find": "Ice Cream", "ReplaceWith": "" },
+    { "Find": "Nut Mixture", "ReplaceWith": "" },
     { "Find": " d", "ReplaceWith": "" },
     { "Find": "Apple s", "ReplaceWith": "Apples" },
     { "Find": "Wrapped", "ReplaceWith": "" },
+    { "Find": "Sundae Glass", "ReplaceWith": "" },
+    { "Find": "Portion", "ReplaceWith": "" },
     { "Find": "Pizza Crust", "ReplaceWith": "" }
   ],
   "ContainsOverrides": [
