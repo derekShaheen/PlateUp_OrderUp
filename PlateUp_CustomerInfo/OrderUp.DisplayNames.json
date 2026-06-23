@@ -1,4 +1,5 @@
 {
+  "BundledDefaultsVersion": 1,
   "DishAndIngredientReplacements": [
     { "Find": "Plated", "ReplaceWith": "" },
     { "Find": "(Clone)", "ReplaceWith": "" },
@@ -21,6 +22,7 @@
     { "Find": "Bread", "ReplaceWith": "" },
     { "Find": "Serving", "ReplaceWith": "" },
     { "Find": "Served", "ReplaceWith": "" },
+    { "Find": "Default", "ReplaceWith": "" },
     { "Find": "Ingredient", "ReplaceWith": "" },
     { "Find": "Stand", "ReplaceWith": "" },
     { "Find": "Flavour", "ReplaceWith": "Cake" },

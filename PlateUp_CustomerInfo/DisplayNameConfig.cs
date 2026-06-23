@@ -20,6 +20,8 @@ namespace SkripOrderUp
 
     internal sealed class DisplayNameConfiguration
     {
+        public int BundledDefaultsVersion { get; set; }
+
         public List<DisplayNameReplacement> DishAndIngredientReplacements { get; set; }
             = new List<DisplayNameReplacement>();
 
@@ -85,6 +87,25 @@ namespace SkripOrderUp
                     throw new InvalidDataException("The display-name config was empty.");
 
                 Normalize(_configuration);
+                if (MigrateBundledDefaults(_configuration, defaults))
+                {
+                    try
+                    {
+                        File.WriteAllText(
+                            ConfigPath,
+                            JsonConvert.SerializeObject(_configuration, Formatting.Indented));
+                        Debug.Log(
+                            "[OrderUp] Migrated display-name config to bundled defaults version " +
+                            _configuration.BundledDefaultsVersion + ".");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError(
+                            "[OrderUp] Applied display-name migrations in memory, but failed " +
+                            "to save the config. " + ex.Message);
+                    }
+                }
+
                 RememberFileState();
                 Debug.Log("[OrderUp] Loaded display-name config from " + ConfigPath);
             }
@@ -178,6 +199,91 @@ namespace SkripOrderUp
                 configuration.IngredientOnlyReplacements = new List<DisplayNameReplacement>();
             if (configuration.ContainsOverrides == null)
                 configuration.ContainsOverrides = new List<DisplayNameOverride>();
+        }
+
+        private static bool MigrateBundledDefaults(
+            DisplayNameConfiguration configuration,
+            DisplayNameConfiguration defaults)
+        {
+            if (configuration.BundledDefaultsVersion >= defaults.BundledDefaultsVersion)
+                return false;
+
+            AddMissingReplacements(
+                configuration.DishAndIngredientReplacements,
+                defaults.DishAndIngredientReplacements);
+            AddMissingReplacements(
+                configuration.IngredientOnlyReplacements,
+                defaults.IngredientOnlyReplacements);
+            AddMissingOverrides(
+                configuration.ContainsOverrides,
+                defaults.ContainsOverrides);
+
+            configuration.BundledDefaultsVersion = defaults.BundledDefaultsVersion;
+            return true;
+        }
+
+        private static void AddMissingReplacements(
+            List<DisplayNameReplacement> configuration,
+            List<DisplayNameReplacement> defaults)
+        {
+            for (int i = 0; i < defaults.Count; i++)
+            {
+                DisplayNameReplacement bundledRule = defaults[i];
+                bool exists = false;
+
+                for (int j = 0; j < configuration.Count; j++)
+                {
+                    if (string.Equals(
+                        configuration[j].Find,
+                        bundledRule.Find,
+                        StringComparison.Ordinal))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
+                    configuration.Add(new DisplayNameReplacement
+                    {
+                        Find = bundledRule.Find,
+                        ReplaceWith = bundledRule.ReplaceWith
+                    });
+                }
+            }
+        }
+
+        private static void AddMissingOverrides(
+            List<DisplayNameOverride> configuration,
+            List<DisplayNameOverride> defaults)
+        {
+            for (int i = 0; i < defaults.Count; i++)
+            {
+                DisplayNameOverride bundledRule = defaults[i];
+                bool exists = false;
+
+                for (int j = 0; j < configuration.Count; j++)
+                {
+                    if (string.Equals(
+                        configuration[j].Contains,
+                        bundledRule.Contains,
+                        StringComparison.Ordinal))
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
+                    configuration.Add(new DisplayNameOverride
+                    {
+                        Contains = bundledRule.Contains,
+                        DisplayName = bundledRule.DisplayName
+                    });
+                }
+            }
         }
 
         private static void RememberFileState()
